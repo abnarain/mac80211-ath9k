@@ -436,7 +436,8 @@ u32 ath_calcrxfilter(struct ath_softc *sc)
 	u32 rfilt;
 
 	rfilt = ATH9K_RX_FILTER_UCAST | ATH9K_RX_FILTER_BCAST
-		| ATH9K_RX_FILTER_MCAST;
+		| ATH9K_RX_FILTER_MCAST| ATH9K_RX_FILTER_PHYERR  ; //_HOMESAW_
+
 
 	if (sc->rx.rxfilter & FIF_PROBE_REQ)
 		rfilt |= ATH9K_RX_FILTER_PROBEREQ;
@@ -857,7 +858,12 @@ static bool ath9k_rx_accept(struct ath_common *common,
 			mic_error = false;
 		}
 		if (rx_stats->rs_status & ATH9K_RXERR_PHY)
-			return false;
+#ifdef _HOMESAW_
+      rxs->flag |=RX_FLAG_HOMESAW_FAILED_PHY;
+#else
+    return false;
+#endif
+
 
 		if ((rx_stats->rs_status & ATH9K_RXERR_DECRYPT) ||
 		    (!is_mc && (rx_stats->rs_status & ATH9K_RXERR_KEYMISS))) {
@@ -871,7 +877,8 @@ static bool ath9k_rx_accept(struct ath_common *common,
 		 * we also ignore the CRC error.
 		 */
 		status_mask = ATH9K_RXERR_DECRYPT | ATH9K_RXERR_MIC |
-			      ATH9K_RXERR_KEYMISS;
+      ATH9K_RXERR_KEYMISS  |ATH9K_RXERR_PHY ;// _HOMESAW_
+
 
 		if (ah->is_monitoring && (sc->rx.rxfilter & FIF_FCSFAIL))
 			status_mask |= ATH9K_RXERR_CRC;
@@ -1778,6 +1785,90 @@ div_comb_done:
 	antcomb->alt_recv_cnt = 0;
 }
 
+#ifdef _HOMESAW_
+
+void ath_rx_radiotap(struct ath_softc *sc,
+                     struct sk_buff *skb,
+                     struct ath_rx_status *rs,
+                     u64 tsf)
+{ 
+  struct ath_common *common = ath9k_hw_common(sc->sc_ah);
+  struct ieee80211_rx_status *rxs = IEEE80211_SKB_RXCB(skb);
+  struct ieee80211_hw *hw = sc->hw;
+  struct ath9k_radiotap *rt;
+  struct ath_hw *ah = sc->sc_ah;
+  static phy_start=1;
+
+  int rt_len = sizeof(struct ath9k_radiotap)  ; //ath9k_radiotap_len(sc, rs);
+
+  if (skb_headroom(skb) < rt_len  &&
+      pskb_expand_head(skb, rt_len  , 0, GFP_ATOMIC)) {
+    static int askb=0;
+    if(askb<3)
+      printk("not enugh in ath9k %d\n",askb++);
+    ath_dbg(common, ATH_DBG_QUEUE, "No free space for vendor radiotap\n");
+    goto fail;
+  }
+
+  rxs->flag |= RX_FLAG_HOMESAW_RADIOTAP;
+
+  rt = (struct ath9k_radiotap *)skb_push(skb, rt_len);
+  memset(rt, 0, rt_len);
+  rt->hdr.it_len = cpu_to_le16(rt_len);
+  if (rxs->flag & RX_FLAG_HOMESAW_FAILED_PHY){
+    static int kk=0;
+    if (kk<5)
+      printk("abhinav: phy errs came here %d\n",kk++);
+  }
+
+  rt->hs.time_buf_dur=tsf-rxs->mactime ;
+  if (rt->hs.time_buf_dur <0)
+    rt->hs.time_buf_dur = -1 * rt->hs.time_buf_dur;
+  static int avb2=0;
+  if(avb2<5){
+    printk("abhinav: recv_buff %llu\n", tsf-rxs->mactime) ;
+    if ((unsigned long)rt % __alignof__(struct ath9k_radiotap) == 0)
+      printk("abhinav: in driver align; latest driver \n");
+    avb2++;
+  }
+  /* OUI */
+  rt->oui[0] = 2;
+  rt->oui[1] = 50;
+  rt->oui[2] = 58;
+  rt->sub_namespace = 127;
+  rt->skip_length =cpu_to_le16(sizeof(struct homesaw));
+  rt->hdr.it_present = BIT(0) ;
+  rxs->vendor_radiotap_len = sizeof(struct homesaw);
+  const u16 caplen = 1 ; // rs->rs_datalen ;
+  if(rs->rs_rssi != ATH9K_RSSI_BAD && !rs->rs_moreaggr)
+    rt->hs.rssi_ = 0x1 ; //rs->rs_rssi;
+  else
+    rt->hs.rssi_ = 0x2;// -127;
+
+  if (phy_start){
+//    ah->stats.prev_ast_ani_ofdmerrs = ah->stats.ast_ani_ofdmerrs ;
+  //  ah->stats.prev_ast_ani_ofdmerrs =  ah->stats.ast_ani_ofdmerrs ;
+   // ah->stats.prev_ast_ani_cckerrs =  ah->stats.ast_ani_cckerrs ;
+    printk("abhinav: initializing phy errors \n");
+    phy_start=0;
+  }
+  rt->hs.ofdm_phyerr_ =  0x1;// ah->stats.ast_ani_ofdmerrs -ah->stats.prev_ast_ani_ofdmerrs ;
+  rt->hs.cck_phyerr_ =  0x2; //ah->stats.ast_ani_cckerrs -ah->stats.prev_ast_ani_cckerrs ;
+  rt->hs.phyerr_ = 0x3 ; //sc->debug.stats.rxstats.phy_err-sc->debug.stats.prev_rxstats.phy_err;
+  rt->hs.noise_ = 0x4; // ah->noise ;   
+
+  static int asl=0;
+  if(asl<5){
+    //  printk("abhinav: after calling addition func  skb=%p skb->data=%p \n",skb,skb->data);
+    asl++;
+  }
+
+ fail:
+  return ;
+}
+#endif
+
+
 int ath_rx_tasklet(struct ath_softc *sc, int flush, bool hp)
 {
 	struct ath_buf *bf;
@@ -1845,7 +1936,10 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush, bool hp)
 			rs.is_mybeacon = false;
 
 		ath_debug_stat_rx(sc, &rs);
-
+    static int a=0;
+    if (a<5)
+      printk("abhinav:works %d\n",a++);
+      
 		/*
 		 * If we're asked to flush receive queue, directly
 		 * chain it back at the queue without processing it.
@@ -1902,6 +1996,15 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush, bool hp)
 			bf->bf_mpdu = NULL;
 			bf->bf_buf_addr = 0;
 			ath_err(common, "dma_mapping_error() on RX\n");
+#ifdef _HOMESAW_
+      ath_rx_radiotap(sc,skb,&rs,tsf);
+      if(rxs->flag & RX_FLAG_FAILED_FCS_CRC){
+        static int l=0;
+        if(l<3)
+          printk("abhinav : crc flag set before brk %d\n",l++);
+      }
+#endif
+
 			ieee80211_rx(hw, skb);
 			break;
 		}
@@ -1963,7 +2066,14 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush, bool hp)
 
 		if ((ah->caps.hw_caps & ATH9K_HW_CAP_ANT_DIV_COMB) && sc->ant_rx == 3)
 			ath_ant_comb_scan(sc, &rs);
-
+#ifdef _HOMESAW_
+    ath_rx_radiotap(sc,skb,&rs,tsf);
+    if(rxs->flag & RX_FLAG_FAILED_FCS_CRC){
+      static int l_end=0;
+      if (l_end<3)
+        printk("abhinav : crc flag set at end %d\n",l_end++ );
+    }
+#endif 
 		ieee80211_rx(hw, skb);
 
 requeue_drop_frag:

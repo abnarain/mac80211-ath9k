@@ -29,6 +29,37 @@
 #include "tkip.h"
 #include "wme.h"
 
+
+
+#ifndef _HOMESAW_
+//#define abhinav
+#define _HOMESAW_
+#endif
+
+#ifdef _HOMESAW_
+struct homesaw{
+  u_int32_t phyerr_;
+  u_int32_t cck_phyerr_;
+  u_int32_t ofdm_phyerr_;
+  u_int32_t time_buf_dur;
+
+  u_int16_t caplen_ ;
+  int8_t rssi_ ;
+  s8 noise_ ;
+} __packed ;
+struct ath9k_radiotap {
+  struct ieee80211_radiotap_header hdr;
+
+  /* Vendor extension header */
+  u8 oui[3];
+  u8 sub_namespace;
+  __le16 skip_length;
+  struct homesaw hs ;
+  //{put your additional field here properly padded per radiotap spec}
+
+} __packed;
+#endif
+
 /*
  * monitor mode reception
  *
@@ -38,6 +69,25 @@
 static struct sk_buff *remove_monitor_info(struct ieee80211_local *local,
 					   struct sk_buff *skb)
 {
+
+#ifdef _HOMESAW_  
+  struct ath9k_radiotap* a9k_rthdr ;
+  struct ieee80211_radiotap_header *rthdr;
+  int len ;
+  static int la=0;
+  if (la<5)
+    printk("abhinav: removing the header %d\n",la++);
+  struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(skb);
+  if (status->flag & RX_FLAG_HOMESAW_RADIOTAP) {
+    rthdr = (struct ieee80211_radiotap_header *) skb->data;
+    a9k_rthdr = (struct ath9k_radiotap *) skb->data;
+    len= le16_to_cpu(rthdr->it_len) ;
+    if (likely(len > FCS_LEN))
+      __pskb_pull(skb,len);
+  }
+#endif
+
+
 	if (local->hw.flags & IEEE80211_HW_RX_INCLUDES_FCS) {
 		if (likely(skb->len > FCS_LEN))
 			__pskb_trim(skb, skb->len - FCS_LEN);
@@ -105,6 +155,38 @@ ieee80211_add_rx_radiotap_header(struct ieee80211_local *local,
 {
 	struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(skb);
 	struct ieee80211_radiotap_header *rthdr;
+
+
+  struct ath9k_radiotap* a9k_rthdr ;
+  struct ath9k_radiotap *a9k_t;
+  struct ath9k_radiotap a9k ;
+  a9k_t = (struct ath9k_radiotap*) skb->data ;
+  memset(&a9k,0,sizeof(struct ath9k_radiotap));
+  a9k.hdr.it_present = a9k_t->hdr.it_present ;
+  a9k.oui[0]=a9k_t->oui[0];
+  a9k.oui[1]=a9k_t->oui[1];
+  a9k.oui[2]=a9k_t->oui[2];
+  a9k.sub_namespace= a9k_t->sub_namespace;
+  a9k.skip_length =a9k_t->skip_length ;
+  a9k.hs.phyerr_  = a9k_t->hs.phyerr_  ;
+  a9k.hs.cck_phyerr_ = a9k_t->hs.cck_phyerr_ ;
+  a9k.hs.ofdm_phyerr_ = a9k_t->hs.ofdm_phyerr_ ;
+  a9k.hs.caplen_ =  a9k_t->hs.caplen_ ;
+  a9k.hs.rssi_ = a9k_t->hs.rssi_ ;
+  a9k.hs.noise_ =  a9k_t->hs.noise_ ;
+  u16 len;
+  if (status->flag & RX_FLAG_HOMESAW_RADIOTAP) {
+    rthdr = (struct ieee80211_radiotap_header *) skb->data;
+    a9k_rthdr = (struct ath9k_radiotap *) skb->data;
+    len= le16_to_cpu(rthdr->it_len) ;
+    if (likely(len > FCS_LEN))
+      __pskb_pull(skb,len);
+  } 
+
+  static int ak=0;
+  if (ak<5){
+    printk("abhinav: caplen %u, phyerr_=%u, sn=%d %d\n", a9k.hs.caplen_,a9k.hs.phyerr_,ak++);
+  }
 	unsigned char *pos;
 	u16 rx_flags = 0;
 
@@ -116,7 +198,10 @@ ieee80211_add_rx_radiotap_header(struct ieee80211_local *local,
 		cpu_to_le32((1 << IEEE80211_RADIOTAP_FLAGS) |
 			    (1 << IEEE80211_RADIOTAP_CHANNEL) |
 			    (1 << IEEE80211_RADIOTAP_ANTENNA) |
-			    (1 << IEEE80211_RADIOTAP_RX_FLAGS));
+			    (1 << IEEE80211_RADIOTAP_RX_FLAGS)|
+          (1 << IEEE80211_RADIOTAP_VENDOR_NAMESPACE)|
+          (1 << IEEE80211_RADIOTAP_EXT));
+  
 	rthdr->it_len = cpu_to_le16(rtap_len);
 
 	pos = (unsigned char *)(rthdr+1);

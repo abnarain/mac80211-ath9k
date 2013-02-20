@@ -206,6 +206,17 @@ enum ieee80211_radiotap_type {
 
 	IEEE80211_RADIOTAP_MCS = 19,
 
+  //_HOMESAW_
+  IEEE80211_RADIOTAP_PHYERR_COUNT = 20,
+  IEEE80211_RADIOTAP_CCK_PHYERR_COUNT = 21,
+  IEEE80211_RADIOTAP_OFDM_PHYERR_COUNT = 22,
+  IEEE80211_RADIOTAP_TOTAL_TIME=23,
+  IEEE80211_RADIOTAP_CONTENTION_TIME=24,
+  IEEE80211_RADIOTAP_RX_QUEUE_TIME=25,
+  IEEE80211_RADIOTAP_CAPLEN = 26,
+  IEEE80211_RADIOTAP_RSSI = 27,
+  IEEE80211_RADIOTAP_RATES_TRIED=28,
+
 	/* valid in every it_present bitmap, even vendor namespaces */
 	IEEE80211_RADIOTAP_RADIOTAP_NAMESPACE = 29,
 	IEEE80211_RADIOTAP_VENDOR_NAMESPACE = 30,
@@ -237,6 +248,12 @@ enum ieee80211_radiotap_type {
 						 * with fragmentation
 						 */
 #define	IEEE80211_RADIOTAP_F_FCS	0x10	/* frame includes FCS */
+
+
+#define IEEE80211_RADIOTAP_F_HOMESAW_FAILED_PHY 0x20; /*frame has PHY ERR*/
+#define IEEE80211_RADIOTAP_F_HOMESAW_RX_AGG 0x10 /*frame was aggregated frame */
+
+
 #define	IEEE80211_RADIOTAP_F_DATAPAD	0x20	/* frame has padding between
 						 * 802.11 header and payload
 						 * (to 32-bit boundary)
@@ -252,6 +269,8 @@ enum ieee80211_radiotap_type {
 #define IEEE80211_RADIOTAP_F_TX_CTS	0x0002	/* used cts 'protection' */
 #define IEEE80211_RADIOTAP_F_TX_RTS	0x0004	/* used rts/cts handshake */
 #define IEEE80211_RADIOTAP_F_TX_NOACK	0x0008	/* don't expect an ack */
+
+#define IEEE80211_RADIOTAP_F_TX_AGG 0x0010  /* _HOMESAW_ constant */
 
 
 /* For IEEE80211_RADIOTAP_MCS */

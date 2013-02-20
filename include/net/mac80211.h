@@ -672,6 +672,9 @@ enum mac80211_rx_flags {
 	RX_FLAG_HT		= 1<<9,
 	RX_FLAG_40MHZ		= 1<<10,
 	RX_FLAG_SHORT_GI	= 1<<11,
+	RX_FLAG_HOMESAW_RADIOTAP =1<<12,
+	RX_FLAG_HOMESAW_FAILED_PHY=1<<13,	
+
 };
 
 /**
@@ -710,6 +713,7 @@ struct ieee80211_rx_status {
 	int rate_idx;
 	int flag;
 	unsigned int rx_flags;
+	int vendor_radiotap_len ;
 };
 
 /**

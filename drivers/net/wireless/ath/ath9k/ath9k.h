@@ -27,6 +27,35 @@
 #include "common.h"
 #include "mci.h"
 
+#define _HOMESAW_
+#ifdef _HOMESAW_
+#include <net/ieee80211_radiotap.h>
+
+struct homesaw{
+  u_int32_t phyerr_;
+  u_int32_t cck_phyerr_;
+  u_int32_t ofdm_phyerr_;
+  u_int32_t time_buf_dur;
+
+  u_int16_t caplen_ ;
+  int8_t rssi_ ;
+  s8 noise_ ;
+} __packed ;
+
+struct ath9k_radiotap {
+  struct ieee80211_radiotap_header hdr;
+  /* Vendor extension header */
+  u8 oui[3];
+  u8 sub_namespace;
+  __le16 skip_length;
+  //custom data structure
+  struct homesaw hs ;
+} __packed;
+
+#endif
+
+
+
 /*
  * Header for the ath9k.ko driver core *only* -- hw code nor any other driver
  * should rely on this file or its contents.
