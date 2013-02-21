@@ -132,14 +132,30 @@ ieee80211_rx_radiotap_len(struct ieee80211_local *local,
 		len += 8;
 	if (local->hw.flags & IEEE80211_HW_SIGNAL_DBM)
 		len += 1;
-
-	if (len & 1) /* padding for RX_FLAGS if necessary */
 		len++;
 
 	if (status->flag & RX_FLAG_HT) /* HT info */
 		len += 3;
 
-	return len;
+#ifdef _HOMESAW_
+  if (status->vendor_radiotap_len) {
+    /* align standard part of vendor namespace */
+      static int al=0;
+      if (al<5)
+        printk("abhinav: len before align =%d %d\n",len,al);
+      len = ALIGN(len, 2);
+      if (al<5)
+        printk("abhinav: after before align =%d %d\n",len,al);
+      /* allocate standard part of vendor namespace */
+      len += 6;
+      /* align vendor-defined part */
+      len +=sizeof(struct homesaw);
+      if (al<5)
+        printk("abhinav:eventual len = %d %d\n",len,al++);
+  }
+#endif
+
+	return 58;
 }
 
 /*
@@ -175,6 +191,11 @@ ieee80211_add_rx_radiotap_header(struct ieee80211_local *local,
   a9k.hs.rssi_ = a9k_t->hs.rssi_ ;
   a9k.hs.noise_ =  a9k_t->hs.noise_ ;
   u16 len;
+  static int kk=0;
+  if (kk<5){
+	printk("abhinav: prev caplen=%u phyerr_=%u cck=%u sn=%d\n",a9k_t->hs.caplen_,a9k_t->hs.phyerr_,a9k_t->hs.cck_phyerr_,kk++);
+
+  }
   if (status->flag & RX_FLAG_HOMESAW_RADIOTAP) {
     rthdr = (struct ieee80211_radiotap_header *) skb->data;
     a9k_rthdr = (struct ath9k_radiotap *) skb->data;
@@ -185,7 +206,7 @@ ieee80211_add_rx_radiotap_header(struct ieee80211_local *local,
 
   static int ak=0;
   if (ak<5){
-    printk("abhinav: caplen %u, phyerr_=%u, sn=%d %d\n", a9k.hs.caplen_,a9k.hs.phyerr_,ak++);
+    printk("abhinav: caplen %u, phyerr_=%u, cck=%u sn=%d \n", a9k.hs.caplen_,a9k.hs.phyerr_,a9k.hs.cck_phyerr_,ak++);
   }
 	unsigned char *pos;
 	u16 rx_flags = 0;
@@ -266,7 +287,11 @@ ieee80211_add_rx_radiotap_header(struct ieee80211_local *local,
 			cpu_to_le32(1 << IEEE80211_RADIOTAP_DBM_ANTSIGNAL);
 		pos++;
 	}
-
+	/* IEEE80211_RADIOTAP_DBM_ANTNOISE */
+  rthdr->it_present |=
+    cpu_to_le32(1 << IEEE80211_RADIOTAP_DBM_ANTNOISE);
+  *pos=a9k.hs.noise_; 
+  pos++;
 	/* IEEE80211_RADIOTAP_LOCK_QUALITY is missing */
 
 	/* IEEE80211_RADIOTAP_ANTENNA */
@@ -297,6 +322,61 @@ ieee80211_add_rx_radiotap_header(struct ieee80211_local *local,
 		pos++;
 		*pos++ = status->rate_idx;
 	}
+
+#ifdef  _HOMESAW_
+
+  *pos++=a9k.oui[0];
+  *pos++=a9k.oui[1];
+  *pos++=a9k.oui[2];
+  *pos++=a9k.sub_namespace;
+  put_unaligned_le16(a9k.skip_length,pos);  
+  pos +=2;
+  if (status->vendor_radiotap_len) {
+    /* ensure 2 byte alignment for the vendor field as required */
+    if ((pos - (u8 *)rthdr) & 1) {
+      *pos++ = 0;
+      static int k=0;
+      if (k<3){
+        printk("abhinav: allignment cared %d \n",k++);
+      }
+
+    }
+    static la1 =0;
+    if (la1<5)
+      printk("abhinav: vendor_radiotap_len %u %d \n",a9k.sub_namespace,la1++);
+    *pos++ = a9k.oui[0];
+    *pos++ = a9k.oui[1];
+    *pos++ = a9k.oui[2];
+    *pos++ = a9k.sub_namespace;
+    put_unaligned_le16(a9k.skip_length, pos);
+    pos += 2;
+    rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_PHYERR_COUNT);
+    put_unaligned_le32(0x1/*a9k.hs.phyerr_*/,pos);
+    pos +=4 ;
+    rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_CCK_PHYERR_COUNT);
+    put_unaligned_le32(0x2/*a9k.hs.cck_phyerr_*/,pos);
+    pos +=4 ;
+    rthdr->it_present |= cpu_to_le32(1 <<IEEE80211_RADIOTAP_OFDM_PHYERR_COUNT);
+    put_unaligned_le32(0x3/*a9k.hs.ofdm_phyerr_*/,pos);
+    pos +=4 ;
+    rthdr->it_present |= cpu_to_le32(1 <<IEEE80211_RADIOTAP_RX_QUEUE_TIME);
+    put_unaligned_le32(0x4,pos);
+    pos +=4;
+    rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_CAPLEN);
+    put_unaligned_le16(0x5/*a9k.hs.caplen_*/,pos) ;
+    pos +=2 ;
+    rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_RSSI);
+    *pos = 0x6;//a9k.hs.rssi_ ;
+    pos++;
+	static int caleb=0;
+    if (caleb <5)
+      printk("abhinav: header %d %d\n",pos-(unsigned char*)rthdr,caleb++);
+  }
+
+#endif
+
+
+
 }
 
 /*

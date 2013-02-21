@@ -1839,23 +1839,23 @@ void ath_rx_radiotap(struct ath_softc *sc,
   rt->skip_length =cpu_to_le16(sizeof(struct homesaw));
   rt->hdr.it_present = BIT(0) ;
   rxs->vendor_radiotap_len = sizeof(struct homesaw);
-  const u16 caplen = 1 ; // rs->rs_datalen ;
+  rt->hs.caplen_ = rs->rs_datalen ;
   if(rs->rs_rssi != ATH9K_RSSI_BAD && !rs->rs_moreaggr)
-    rt->hs.rssi_ = 0x1 ; //rs->rs_rssi;
+    rt->hs.rssi_ = 0x12 ; //rs->rs_rssi;
   else
-    rt->hs.rssi_ = 0x2;// -127;
+    rt->hs.rssi_ = 0x33;// -127;
 
   if (phy_start){
-//    ah->stats.prev_ast_ani_ofdmerrs = ah->stats.ast_ani_ofdmerrs ;
-  //  ah->stats.prev_ast_ani_ofdmerrs =  ah->stats.ast_ani_ofdmerrs ;
-   // ah->stats.prev_ast_ani_cckerrs =  ah->stats.ast_ani_cckerrs ;
+    ah->stats.prev_ast_ani_ofdmerrs = ah->stats.ast_ani_ofdmerrs ;
+    ah->stats.prev_ast_ani_cckerrs =  ah->stats.ast_ani_cckerrs ;
+	sc->debug.stats.rxstats.prev_phy_err= sc->debug.stats.rxstats.phy_err;
     printk("abhinav: initializing phy errors \n");
     phy_start=0;
   }
-  rt->hs.ofdm_phyerr_ =  0x1;// ah->stats.ast_ani_ofdmerrs -ah->stats.prev_ast_ani_ofdmerrs ;
-  rt->hs.cck_phyerr_ =  0x2; //ah->stats.ast_ani_cckerrs -ah->stats.prev_ast_ani_cckerrs ;
-  rt->hs.phyerr_ = 0x3 ; //sc->debug.stats.rxstats.phy_err-sc->debug.stats.prev_rxstats.phy_err;
-  rt->hs.noise_ = 0x4; // ah->noise ;   
+  rt->hs.ofdm_phyerr_ =  ah->stats.ast_ani_ofdmerrs -ah->stats.prev_ast_ani_ofdmerrs ;
+  rt->hs.cck_phyerr_ =  ah->stats.ast_ani_cckerrs -ah->stats.prev_ast_ani_cckerrs ;
+  rt->hs.phyerr_ = sc->debug.stats.rxstats.phy_err-sc->debug.stats.rxstats.prev_phy_err;
+  rt->hs.noise_ = ah->noise ;   
 
   static int asl=0;
   if(asl<5){

@@ -152,6 +152,8 @@ struct ar5416Stats {
 	u32 ast_ani_lneg_or_lzero;
 	u32 avgbrssi;
 	struct ath9k_mib_stats ast_mibstats;
+    u32 prev_ast_ani_ofdmerrs; /*_HOMESAW*/
+    u32 prev_ast_ani_cckerrs;
 };
 #define ah_mibStats stats.ast_mibstats
 

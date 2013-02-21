@@ -164,6 +164,7 @@ struct ath_rx_stats {
 	u32 post_delim_crc_err;
 	u32 decrypt_busy_err;
 	u32 phy_err_stats[ATH9K_PHYERR_MAX];
+	u32 prev_phy_err  ;/*_HOMESAW_ */
 };
 
 enum ath_reset_type {
