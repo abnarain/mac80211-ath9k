@@ -1821,12 +1821,13 @@ void ath_rx_radiotap(struct ath_softc *sc,
       printk("abhinav: phy errs came here %d\n",kk++);
   }
 
-  rt->hs.time_buf_dur=tsf-rxs->mactime ;
-  if (rt->hs.time_buf_dur <0)
-    rt->hs.time_buf_dur = -1 * rt->hs.time_buf_dur;
+  rt->hs.time_buf_dur_=tsf-rxs->mactime ;
+  if (rt->hs.time_buf_dur_ <0){
+    rt->hs.time_buf_dur_ = rxs->mactime-tsf ;
+  }
   static int avb2=0;
   if(avb2<5){
-    printk("abhinav: recv_buff %llu\n", tsf-rxs->mactime) ;
+    printk("abhinav: recv_buff %llu\n", rt->hs.time_buf_dur_) ;
     if ((unsigned long)rt % __alignof__(struct ath9k_radiotap) == 0)
       printk("abhinav: in driver align; latest driver \n");
     avb2++;
@@ -1841,11 +1842,11 @@ void ath_rx_radiotap(struct ath_softc *sc,
   rxs->vendor_radiotap_len = sizeof(struct homesaw);
   rt->hs.caplen_ = rs->rs_datalen ;
   if(rs->rs_rssi != ATH9K_RSSI_BAD && !rs->rs_moreaggr)
-    rt->hs.rssi_ = 0x12 ; //rs->rs_rssi;
+    rt->hs.rssi_ = rs->rs_rssi;
   else
-    rt->hs.rssi_ = 0x33;// -127;
+    rt->hs.rssi_ =  -127;
 
-  if (phy_start){
+  if (unlikely(phy_start)){
     ah->stats.prev_ast_ani_ofdmerrs = ah->stats.ast_ani_ofdmerrs ;
     ah->stats.prev_ast_ani_cckerrs =  ah->stats.ast_ani_cckerrs ;
 	sc->debug.stats.rxstats.prev_phy_err= sc->debug.stats.rxstats.phy_err;
@@ -1856,12 +1857,9 @@ void ath_rx_radiotap(struct ath_softc *sc,
   rt->hs.cck_phyerr_ =  ah->stats.ast_ani_cckerrs -ah->stats.prev_ast_ani_cckerrs ;
   rt->hs.phyerr_ = sc->debug.stats.rxstats.phy_err-sc->debug.stats.rxstats.prev_phy_err;
   rt->hs.noise_ = ah->noise ;   
-
-  static int asl=0;
-  if(asl<5){
-    //  printk("abhinav: after calling addition func  skb=%p skb->data=%p \n",skb,skb->data);
-    asl++;
-  }
+  ah->stats.prev_ast_ani_ofdmerrs =ah->stats.ast_ani_ofdmerrs ;
+  ah->stats.prev_ast_ani_cckerrs =ah->stats.ast_ani_cckerrs ;
+  sc->debug.stats.rxstats.prev_phy_err =sc->debug.stats.rxstats.phy_err;
 
  fail:
   return ;
@@ -1936,10 +1934,6 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush, bool hp)
 			rs.is_mybeacon = false;
 
 		ath_debug_stat_rx(sc, &rs);
-    static int a=0;
-    if (a<5)
-      printk("abhinav:works %d\n",a++);
-      
 		/*
 		 * If we're asked to flush receive queue, directly
 		 * chain it back at the queue without processing it.

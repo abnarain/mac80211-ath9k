@@ -35,7 +35,7 @@ struct homesaw{
   u_int32_t phyerr_;
   u_int32_t cck_phyerr_;
   u_int32_t ofdm_phyerr_;
-  u_int32_t time_buf_dur;
+  u_int32_t time_buf_dur_;
 
   u_int16_t caplen_ ;
   int8_t rssi_ ;
@@ -259,6 +259,7 @@ struct ath_buf {
 	dma_addr_t bf_buf_addr;	/* physical addr of data buffer, for DMA */
 	bool bf_stale;
 	struct ath_buf_state bf_state;
+	u64 timestamp_head; /*_HOMESAW_*/
 };
 
 struct ath_atx_tid {

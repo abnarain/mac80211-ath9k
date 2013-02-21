@@ -16,7 +16,7 @@
 #include "mesh.h"
 #include "led.h"
 #include "wme.h"
-
+#define _HOMESAW_
 
 void ieee80211_tx_status_irqsafe(struct ieee80211_hw *hw,
 				 struct sk_buff *skb)
@@ -265,7 +265,11 @@ static int ieee80211_tx_radiotap_len(struct ieee80211_tx_info *info)
 
 static void ieee80211_add_tx_radiotap_header(struct ieee80211_supported_band
 					     *sband, struct sk_buff *skb,
-					     int retry_count, int rtap_len)
+					     int retry_count, int rtap_len						 
+#ifdef _HOMESAW_
+              , struct ieee80211_hw* hw
+#endif					 
+						 )
 {
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
@@ -281,6 +285,12 @@ static void ieee80211_add_tx_radiotap_header(struct ieee80211_supported_band
 		cpu_to_le32((1 << IEEE80211_RADIOTAP_TX_FLAGS) |
 			    (1 << IEEE80211_RADIOTAP_DATA_RETRIES));
 	pos = (unsigned char *)(rthdr + 1);
+
+    /* IEEE80211_RADIOTAP_TSFT */	
+	put_unaligned_le64(0x9/*status->mactime*/, pos);
+	rthdr->it_present |=
+	           cpu_to_le32(1 << IEEE80211_RADIOTAP_TSFT);
+	pos += 8;
 
 	/*
 	 * XXX: Once radiotap gets the bitmap reset thing the vendor
@@ -333,17 +343,35 @@ static void ieee80211_add_tx_radiotap_header(struct ieee80211_supported_band
 		pos[2] = info->status.rates[0].idx;
 		pos += 3;
 	}
+#ifdef _HOMESAW_
   rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_TOTAL_TIME);
   put_unaligned_le32(0x3,pos);
   pos +=4;
   rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_CONTENTION_TIME);
   put_unaligned_le32(0x4,pos);
   pos +=4;
-  static int ll=0;
-  if (ll<5){    
-    printk("in tx code and works%d", ll++);
+  unsigned char * temp=pos ;
+  int i ;
+  for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
+    if (info->status.rates[i].idx < 0) {
+      break;
+    } else if (i >= hw->max_report_rates) {
+      /* the HW cannot have attempted that rate */
+      //info->status.rates[i].idx = -1;
+      //info->status.rates[i].count = 0;
+      break;
+    }
+    *pos= info->status.rates[i].idx;
+    pos++;
+    *pos=info->status.rates[i].count ;
+    pos++;
+    //info->status.rates[i].flags;
+    //pos++;
   }
-
+ pos= temp+10;  
+  *pos=0x5;
+  pos++;
+#endif 
 }
 
 /*
@@ -606,14 +634,21 @@ void ieee80211_tx_status(struct ieee80211_hw *hw, struct sk_buff *skb)
 
 	/* send frame to monitor interfaces now */
 	rtap_len = ieee80211_tx_radiotap_len(info);
-	//if (WARN_ON_ONCE(skb_headroom(skb) < rtap_len)) {
+#ifndef _HOMESAW_
+	if (WARN_ON_ONCE(skb_headroom(skb) < rtap_len)) {
+#else		
 	if(pskb_expand_head(skb, rtap_len, 0, GFP_ATOMIC)<0){
-		printk("ieee80211_tx_status: headroom too small\n");
+#endif		
+		printk("ieee80211_tx_status: can't allocate headroom for homesaw\n");
 		dev_kfree_skb(skb);
 		return NULL;
 	}
-	//}
-	ieee80211_add_tx_radiotap_header(sband, skb, retry_count, rtap_len);
+	ieee80211_add_tx_radiotap_header(sband, skb, retry_count, rtap_len
+#ifdef _HOMESAW_
+	,hw);
+#else	
+	);
+#endif	
 
 	/* XXX: is this sufficient for BPF? */
 	skb_set_mac_header(skb, 0);
