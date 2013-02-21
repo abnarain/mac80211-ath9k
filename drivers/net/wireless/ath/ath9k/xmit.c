@@ -1609,7 +1609,7 @@ static void ath_tx_txqaddbuf(struct ath_softc *sc, struct ath_txq *txq,
 	struct ath_buf *bf, *bf_last;
 	bool puttxbuf = false;
 	bool edma;
-
+	u64 tsf ;
 	/*
 	 * Insert the frame on the outbound list and
 	 * pass it on to the hardware.
@@ -1655,7 +1655,10 @@ static void ath_tx_txqaddbuf(struct ath_softc *sc, struct ath_txq *txq,
 		TX_STAT_INC(txq->axq_qnum, txstart);
 		ath9k_hw_txstart(ah, txq->axq_qnum);
 	}
-
+	tsf = ath9k_hw_gettsf64(ah);
+	static int tts=0;
+	if(tts<5)
+		printk("abhinav: got tsf %d\n",tts++);
 	if (!internal) {
 		txq->axq_depth++;
 		if (bf_is_ampdu_not_probing(bf))
@@ -2067,8 +2070,8 @@ static void ath_tx_rc_status(struct ath_softc *sc, struct ath_buf *bf,
 	struct ath_hw *ah = sc->sc_ah;
 	u8 i, tx_rateindex;
 
-	if (txok)
-		tx_info->status.ack_signal = ts->ts_rssi;
+	//if (txok) /*_HOMESAW_*/
+	//	tx_info->status.ack_signal = ts->ts_rssi;
 
 	tx_rateindex = ts->ts_rateindex;
 	WARN_ON(tx_rateindex >= hw->max_rates);

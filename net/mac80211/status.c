@@ -233,6 +233,8 @@ static int ieee80211_tx_radiotap_len(struct ieee80211_tx_info *info)
 {
 	int len = sizeof(struct ieee80211_radiotap_header);
 
+  /*IEEE80211_RADIOTAP_TSF_TIME*/
+  len +=8;
 	/* IEEE80211_RADIOTAP_RATE rate */
 	if (info->status.rates[0].idx >= 0 &&
 	    !(info->status.rates[0].flags & IEEE80211_TX_RC_MCS))
@@ -248,8 +250,17 @@ static int ieee80211_tx_radiotap_len(struct ieee80211_tx_info *info)
 	if (info->status.rates[0].idx >= 0 &&
 	    info->status.rates[0].flags & IEEE80211_TX_RC_MCS)
 		len += 3;
+  
+#ifdef _HOMESAW_
+  len +=8;
+  len +=10;
+  static int gore=0;
+  if (gore <5) {
+    printk("abhinav:tx len=%d %d\n",len,gore++);
+  }  
+#endif 
 
-	return len;
+	return 42;
 }
 
 static void ieee80211_add_tx_radiotap_header(struct ieee80211_supported_band
@@ -322,6 +333,16 @@ static void ieee80211_add_tx_radiotap_header(struct ieee80211_supported_band
 		pos[2] = info->status.rates[0].idx;
 		pos += 3;
 	}
+  rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_TOTAL_TIME);
+  put_unaligned_le32(0x3,pos);
+  pos +=4;
+  rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_CONTENTION_TIME);
+  put_unaligned_le32(0x4,pos);
+  pos +=4;
+  static int ll=0;
+  if (ll<5){    
+    printk("in tx code and works%d", ll++);
+  }
 
 }
 
@@ -585,11 +606,13 @@ void ieee80211_tx_status(struct ieee80211_hw *hw, struct sk_buff *skb)
 
 	/* send frame to monitor interfaces now */
 	rtap_len = ieee80211_tx_radiotap_len(info);
-	if (WARN_ON_ONCE(skb_headroom(skb) < rtap_len)) {
-		printk(KERN_ERR "ieee80211_tx_status: headroom too small\n");
+	//if (WARN_ON_ONCE(skb_headroom(skb) < rtap_len)) {
+	if(pskb_expand_head(skb, rtap_len, 0, GFP_ATOMIC)<0){
+		printk("ieee80211_tx_status: headroom too small\n");
 		dev_kfree_skb(skb);
-		return;
+		return NULL;
 	}
+	//}
 	ieee80211_add_tx_radiotap_header(sband, skb, retry_count, rtap_len);
 
 	/* XXX: is this sufficient for BPF? */
