@@ -323,13 +323,14 @@ static struct ath_buf* ath_clone_txbuf(struct ath_softc *sc, struct ath_buf *bf)
 	if (WARN_ON(!tbf))
 		return NULL;
 
-	ATH_TXBUF_RESET(tbf);
+	ATH_TXBUF_RESET(tbf); // I am not changing the reset macro. Doesn't matter imo
 
 	tbf->bf_mpdu = bf->bf_mpdu;
 	tbf->bf_buf_addr = bf->bf_buf_addr;
 	memcpy(tbf->bf_desc, bf->bf_desc, sc->sc_ah->caps.tx_desc_len);
 	tbf->bf_state = bf->bf_state;
-	tbf->timestamp_head = bf->timestamp_head;
+	/*_HOMESAW_*/
+	tbf->timestamp_enqueue = bf->timestamp_enqueue;
 
 	return tbf;
 }
@@ -568,6 +569,12 @@ static void ath_tx_complete_aggr(struct ath_softc *sc, struct ath_txq *txq,
 					fi->bf = tbf;
 				}
 			}
+			/*
+			abhinav's comment : 
+			The frame is sent to the pending queue, 
+			and we loose the corresponding 'ath_tx_status'			
+			descriptor information. so need to add some code here.
+			*/
 
 			/*
 			 * Put this buffer to the temporary pending
@@ -941,7 +948,8 @@ static void ath_buf_set_rate(struct ath_softc *sc, struct ath_buf *bf,
 
 	/*
 	abhinav's comment :
-	airtime calculation 
+	airtime calculation; reused in ath_tx_complete_buf() to loop over each
+	the retransmitted frame rates and adding 802.11 constants 
 	*/
 	for (i = 0; i < 4; i++) {
 		bool is_40, is_sgi, is_sp;
@@ -1700,7 +1708,7 @@ static void ath_tx_txqaddbuf(struct ath_softc *sc, struct ath_txq *txq,
 	/*
 	abhinav's comment : The frame is pushed to the hardware buffer
 	*/
-	bf->timestamp_head =  ath9k_hw_gettsf64(ah);
+	bf->timestamp_enqueue =  ath9k_hw_gettsf64(ah);
 	if (!internal) {
 		txq->axq_depth++;
 		if (bf_is_ampdu_not_probing(bf))
@@ -2053,20 +2061,6 @@ static void ath_tx_complete(struct ath_softc *sc, struct sk_buff *skb,
 		spin_unlock_bh(&txq->axq_lock);
 	}
 
-	/*
-	abhinav's comment: 
-	In my previous implelementation, 
-	I had instrumented the frame timings here
-	by shoving the data in skb buff here.
-	
-	I did the instrumentation here since, 
-	every frame was eventually passing through this.
-	
-	Since from traces, we know we are only messing up
-	a subset of 802.11 n timestamps, I am going to add something 
-	extra in ath_tx_complete_aggr() at multiple calls to ath_tx_complete_buff())
-	
-	*/
 	ieee80211_tx_status(hw, skb);
 }
 
@@ -2090,6 +2084,17 @@ static void ath_tx_complete_buf(struct ath_softc *sc, struct ath_buf *bf,
 
 	dma_unmap_single(sc->dev, bf->bf_buf_addr, skb->len, DMA_TO_DEVICE);
 	bf->bf_buf_addr = 0;
+	/*
+	abhinav's comment: 
+	In my previous implelementation, 
+	I had instrumented the frame timing here
+	by shoving the data in skb buff which is passed to kernel in the ath_tx_complete().
+	ath_tx_complete() gives it to egress function ieee80211_tx_status().
+
+	I did the instrumentation here since, 
+	every frame was eventually passing through this.
+	
+	*/
 
 	if (bf->bf_state.bfs_paprd) {
 		if (time_after(jiffies,
@@ -2126,7 +2131,8 @@ static void ath_tx_rc_status(struct ath_softc *sc, struct ath_buf *bf,
 	struct ath_hw *ah = sc->sc_ah;
 	u8 i, tx_rateindex;
 
-	//if (txok) /*_HOMESAW_*/
+	//if (txok) /*_HOMESAW_*/ commented out as we need space
+	//to get data out of driver to kernel
 	//	tx_info->status.ack_signal = ts->ts_rssi;
 
 	tx_rateindex = ts->ts_rateindex;
@@ -2181,7 +2187,15 @@ static void ath_tx_process_buffer(struct ath_softc *sc, struct ath_txq *txq,
 	/*
 	abhinav's comment : This function seems like dequeue.
 	The depth of the transmit queue is decremented.
+	since ath_tx_status has all the retry counts information.
+	I calcaulate the total airtime for the frame by looping through
+	the retries, (1)the airtime for each transmision of the frame
+	(2) ACK time for
+	(3) SIFS between frames
+	(4) Last ACK 
 	*/
+
+
 	txq->axq_depth--;
 	txok = !(ts->ts_status & ATH9K_TXERR_MASK);
 	txq->axq_tx_inprogress = false;
