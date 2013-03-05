@@ -345,10 +345,10 @@ static void ieee80211_add_tx_radiotap_header(struct ieee80211_supported_band
 	}
 #ifdef _HOMESAW_
   rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_TOTAL_TIME);
-  put_unaligned_le32(0x3,pos);
+  put_unaligned_le32(info->status.total_time,pos);
   pos +=4;
   rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_CONTENTION_TIME);
-  put_unaligned_le32(0x4,pos);
+  put_unaligned_le32(status.contention_time,pos);
   pos +=4;
   unsigned char * temp=pos ;
   int i ;
