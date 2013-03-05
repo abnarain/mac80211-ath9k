@@ -1833,10 +1833,10 @@ void ath_rx_radiotap(struct ath_softc *sc,
     avb2++;
   }
   /* OUI */
-  rt->oui[0] = 2;
-  rt->oui[1] = 50;
-  rt->oui[2] = 58;
-  rt->sub_namespace = 127;
+  rt->oui[0] = 0xb;
+  rt->oui[1] = 0xb;
+  rt->oui[2] = 0xb;
+  rt->sub_namespace = 1;
   rt->skip_length =cpu_to_le16(sizeof(struct homesaw));
   rt->hdr.it_present = BIT(0) ;
   rxs->vendor_radiotap_len = sizeof(struct homesaw);
@@ -1845,6 +1845,9 @@ void ath_rx_radiotap(struct ath_softc *sc,
     rt->hs.rssi_ = rs->rs_rssi;
   else
     rt->hs.rssi_ =  -127;
+
+  if (rs->rs_moreaggr)
+	  rxs->flag |=RX_FLAG_HOMESAW_RX_AGGR ;
 
   if (unlikely(phy_start)){
     ah->stats.prev_ast_ani_ofdmerrs = ah->stats.ast_ani_ofdmerrs ;
