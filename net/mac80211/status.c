@@ -287,7 +287,7 @@ static void ieee80211_add_tx_radiotap_header(struct ieee80211_supported_band
 	pos = (unsigned char *)(rthdr + 1);
 
     /* IEEE80211_RADIOTAP_TSFT */	
-	put_unaligned_le64(0x9/*status->mactime*/, pos);
+	put_unaligned_le64(info->status.timestamp_tx, pos);
 	rthdr->it_present |=
 	           cpu_to_le32(1 << IEEE80211_RADIOTAP_TSFT);
 	pos += 8;
@@ -352,6 +352,7 @@ static void ieee80211_add_tx_radiotap_header(struct ieee80211_supported_band
   pos +=4;
   unsigned char * temp=pos ;
   int i ;
+  rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_RATES_TRIED);
   for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
     if (info->status.rates[i].idx < 0) {
       break;
