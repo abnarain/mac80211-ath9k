@@ -172,9 +172,6 @@ static void ath_tx_flush_tid(struct ath_softc *sc, struct ath_atx_tid *tid)
 		if (bf && fi->retries) {
 			list_add_tail(&bf->list, &bf_head);
 			ath_tx_update_baw(sc, tid, bf->bf_state.seqno);
-						static int klf=0;
-						if(klf<20)
-							printk("abhinav: flush tid %d\n",klf++);
 			ath_tx_complete_buf(sc, bf, txq, &bf_head, &ts, 0, 1);
 		} else {
 			ath_tx_send_normal(sc, txq, NULL, skb);
@@ -258,9 +255,6 @@ static void ath_tid_drain(struct ath_softc *sc, struct ath_txq *txq,
 			ath_tx_update_baw(sc, tid, bf->bf_state.seqno);
 
 		spin_unlock(&txq->axq_lock);
-						static int klg=0;
-						if(klg<20)
-							printk("abhinav: tid drain %d\n",klg++);
 		ath_tx_complete_buf(sc, bf, txq, &bf_head, &ts, 0, 0);
 		spin_lock(&txq->axq_lock);
 	}
@@ -330,7 +324,7 @@ static struct ath_buf* ath_clone_txbuf(struct ath_softc *sc, struct ath_buf *bf)
 	memcpy(tbf->bf_desc, bf->bf_desc, sc->sc_ah->caps.tx_desc_len);
 	tbf->bf_state = bf->bf_state;
 	/*_HOMESAW_*/
-	tbf->timestamp_enqueue = bf->timestamp_enqueue;
+	tbf->timestamp_temp = bf->timestamp_temp;
 
 	return tbf;
 }
@@ -423,10 +417,7 @@ static void ath_tx_complete_aggr(struct ath_softc *sc, struct ath_txq *txq,
 
 			if (!bf->bf_stale || bf_next != NULL)
 				list_move_tail(&bf->list, &bf_head);
-						static int kla=0;
-						if(kla<20)
-							printk("abhinav: !sta %d\n",kla++);
-
+      
 			ath_tx_complete_buf(sc, bf, txq, &bf_head, ts,
 				0, 0);
 
@@ -534,10 +525,7 @@ static void ath_tx_complete_aggr(struct ath_softc *sc, struct ath_txq *txq,
 				ath_tx_rc_status(sc, bf, ts, nframes, nbad, txok);
 				rc_update = false;
 			}
-						static int klb=0;
-						if(klb<20)
-							printk("abhinav: complete the acked ones %d\n",klb++);
-
+			
 			ath_tx_complete_buf(sc, bf, txq, &bf_head, ts,
 				!txfail, sendbar);
 		} else {
@@ -556,12 +544,9 @@ static void ath_tx_complete_aggr(struct ath_softc *sc, struct ath_txq *txq,
 						spin_lock_bh(&txq->axq_lock);
 						ath_tx_update_baw(sc, tid, seqno);
 						spin_unlock_bh(&txq->axq_lock);
-						static int klc=0;
-						if(klc<20)
-							printk("abhinav: complete frame with failed status %d\n",klc++);
 						ath_tx_complete_buf(sc, bf, txq,
-								    &bf_head,
-								    ts, 0,
+                                &bf_head,
+                                ts, 0,
 								    !flush);
 						break;
 					}
@@ -891,7 +876,6 @@ static u32 ath_pkt_duration(struct ath_softc *sc, u8 rix, int pktlen,
 {
 	u32 nbits, nsymbits, duration, nsymbols;
 	int streams;
-
 	/* find number of symbols: PLCP + data */
 	streams = HT_RC_2_STREAMS(rix);
 	nbits = (pktlen << 3) + OFDM_PLCP_BITS;
@@ -985,6 +969,9 @@ static void ath_buf_set_rate(struct ath_softc *sc, struct ath_buf *bf,
 					ah->txchainmask, info->rates[i].Rate);
 			info->rates[i].PktDuration = ath_pkt_duration(sc, rix, len,
 				 is_40, is_sgi, is_sp);
+			static int aa=0;
+			if (aa <50 && len>1000)
+				printk("abhinav(n): rix=%d, len=%d dur=%d %d\n",rix,len,info->rates[i].PktDuration,aa++);
 			if (rix < 8 && (tx_info->flags & IEEE80211_TX_CTL_STBC))
 				info->rates[i].RateFlags |= ATH9K_RATESERIES_STBC;
 			continue;
@@ -1014,6 +1001,9 @@ static void ath_buf_set_rate(struct ath_softc *sc, struct ath_buf *bf,
 
 		info->rates[i].PktDuration = ath9k_hw_computetxtime(sc->sc_ah,
 			phy, rate->bitrate * 100, len, rix, is_sp);
+		static int kon=0;
+		if (kon<50 && len > 1000)
+			printk("abhinav(g): kbps=%d len=%d rix=%d dur=%d %d\n",rate->bitrate *100 , len,rix,info->rates[i].PktDuration,  kon++);
 	}
 
 	/* For AR5416 - RTS cannot be followed by a frame larger than 8K */
@@ -1478,29 +1468,28 @@ static void ath_drain_txq_list(struct ath_softc *sc, struct ath_txq *txq,
 		list_cut_position(&bf_head, list, &lastbf->list);
 
 		/*
-		abhinav's comment : This is also a dequeue.
-		This function executes(printk works).
-		I did not notice this in the previous code I saw,
-		This will help getting the time spent in the queue 
-		(with the other dequeue function).
+		abhinav's comment : The frame is dequeued/ transmitted.
+    calculate total time = time_in_buffer + 
+    time_in_transmission_and_contention    
 		*/
+	struct ath_hw *ah = sc->sc_ah;
+    u64 deq_tsf;
+    deq_tsf =ath9k_hw_gettsf64(ah);
+    bf->total_time = deq_tsf - bf->timestamp_temp ;
+    bf->timestamp_temp = deq_tsf ;
+
+
 		txq->axq_depth--;
 		if (bf_is_ampdu_not_probing(bf))
 			txq->axq_ampdu_depth--;
 
 		spin_unlock_bh(&txq->axq_lock);
 		if (bf_isampdu(bf)){
-		static int lst =0;
-		if (lst<20)
-			printk("abhinav:ath_drain_tx_list ampdu%u %d\n",retry_tx,lst++);
 			ath_tx_complete_aggr(sc, txq, bf, &bf_head, &ts, 0,
 					     retry_tx);
 		}
 		else {
 
-		static int lst =0;
-		if (lst<20)
-			printk("abhinav:ath_drain_tx_list !ampdu %u %d\n",retry_tx,lst++);
 			ath_tx_complete_buf(sc, bf, txq, &bf_head, &ts, 0, 0);
 		}
 		spin_lock_bh(&txq->axq_lock);
@@ -1705,10 +1694,9 @@ static void ath_tx_txqaddbuf(struct ath_softc *sc, struct ath_txq *txq,
 		ath9k_hw_txstart(ah, txq->axq_qnum);
 	}
 	/*_HOMESAW_*/
-	/*
-	abhinav's comment : The frame is pushed to the hardware buffer
+	/*The frame is pushed to the hardware; Enqueue timestamp stored    
 	*/
-	bf->timestamp_enqueue =  ath9k_hw_gettsf64(ah);
+	bf->timestamp_temp =  ath9k_hw_gettsf64(ah);
 	if (!internal) {
 		txq->axq_depth++;
 		if (bf_is_ampdu_not_probing(bf))
@@ -2084,18 +2072,19 @@ static void ath_tx_complete_buf(struct ath_softc *sc, struct ath_buf *bf,
 
 	dma_unmap_single(sc->dev, bf->bf_buf_addr, skb->len, DMA_TO_DEVICE);
 	bf->bf_buf_addr = 0;
-	/*
-	abhinav's comment: 
-	In my previous implelementation, 
-	I had instrumented the frame timing here
-	by shoving the data in skb buff which is passed to kernel in the ath_tx_complete().
-	ath_tx_complete() gives it to egress function ieee80211_tx_status().
 
-	I did the instrumentation here since, 
-	every frame was eventually passing through this.
-	
-	*/
+  tx_info->status.total_time= 0x1;// bf->total_time;
+  tx_info->status.contention_time = 0x2;
+  u32 tsf_lower = bf->timestamp_temp & 0xffffffff;
+  tx_info->status.timestamp_tx = (bf->timestamp_temp & ~0xffffffffULL) | ts->ts_tstamp ;
+  if (ts->ts_tstamp > tsf_lower &&
+      unlikely(ts->ts_tstamp - tsf_lower > 0x10000000))
+    tx_info->status.timestamp_tx -= 0x100000000ULL;
 
+  if (ts->ts_tstamp < tsf_lower &&
+      unlikely(tsf_lower - ts->ts_tstamp > 0x10000000))
+    tx_info->status.timestamp_tx += 0x100000000ULL;
+  
 	if (bf->bf_state.bfs_paprd) {
 		if (time_after(jiffies,
 				bf->bf_state.bfs_paprd_timestamp +
@@ -2170,6 +2159,7 @@ static void ath_tx_rc_status(struct ath_softc *sc, struct ath_buf *bf,
 
 	for (i = tx_rateindex + 1; i < hw->max_rates; i++) {
 		tx_info->status.rates[i].count = 0;
+		struct ath_hw *ah = sc->sc_ah;
 		tx_info->status.rates[i].idx = -1;
 	}
 
@@ -2194,9 +2184,14 @@ static void ath_tx_process_buffer(struct ath_softc *sc, struct ath_txq *txq,
 	(3) SIFS between frames
 	(4) Last ACK 
 	*/
-
-
-	txq->axq_depth--;
+	/*_HOMESAW_*/
+  u64 deq_tsf;
+  struct ath_hw *ah = sc->sc_ah;
+  deq_tsf =ath9k_hw_gettsf64(ah);
+  bf->total_time = deq_tsf - bf->timestamp_temp ;
+  bf->timestamp_temp =deq_tsf ;
+	  
+  txq->axq_depth--;
 	txok = !(ts->ts_status & ATH9K_TXERR_MASK);
 	txq->axq_tx_inprogress = false;
 	if (bf_is_ampdu_not_probing(bf))
@@ -2206,14 +2201,8 @@ static void ath_tx_process_buffer(struct ath_softc *sc, struct ath_txq *txq,
 
 	if (!bf_isampdu(bf)) {
 		ath_tx_rc_status(sc, bf, ts, 1, txok ? 0 : 1, txok);
-						static int kld=0;
-						if(kld<20)
-							printk("abhinav: proces_buf !ampdu %d\n",kld++);
 		ath_tx_complete_buf(sc, bf, txq, bf_head, ts, txok, 0);
 	} else{
-						static int kle=0;
-						if(kle<20)
-							printk("abhinav: process_buff ampdu %d\n",kle++);
 		ath_tx_complete_aggr(sc, txq, bf, bf_head, ts, txok, true);
 	}
 	spin_lock_bh(&txq->axq_lock);

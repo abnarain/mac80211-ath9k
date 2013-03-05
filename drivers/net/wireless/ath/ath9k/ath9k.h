@@ -259,7 +259,8 @@ struct ath_buf {
 	dma_addr_t bf_buf_addr;	/* physical addr of data buffer, for DMA */
 	bool bf_stale;
 	struct ath_buf_state bf_state;
-	u64 timestamp_enqueue; /*_HOMESAW_*/
+	u64 timestamp_temp; /*_HOMESAW_*/
+	u32 total_time ; /*_HOMESAW_*/
 };
 
 struct ath_atx_tid {
