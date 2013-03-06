@@ -562,6 +562,7 @@ struct ieee80211_tx_info {
 			u32 contention_time; /*_HOMESAW_*/
 			//int ack_signal;
 			u8 ampdu_len;
+			u8 tx_aggr_flag;
 			u64 timestamp_tx;
 			u32 total_time;
 			/* 15 bytes free */

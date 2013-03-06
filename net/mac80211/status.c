@@ -312,7 +312,12 @@ static void ieee80211_add_tx_radiotap_header(struct ieee80211_supported_band
 	if (!(info->flags & IEEE80211_TX_STAT_ACK) &&
 	    !is_multicast_ether_addr(hdr->addr1))
 		txflags |= cpu_to_le16(IEEE80211_RADIOTAP_F_TX_FAIL);
-
+	if(info->status.tx_aggr_flag ==1 ){
+		printk("mac80211: aggr\n");
+		txflags |=cpu_to_le16(IEEE80211_RADIOTAP_F_TX_AGG);
+	}else {		
+		printk("mac80211: no aggr %u\n",info->status.tx_aggr_flag);
+	}
 	if ((info->status.rates[0].flags & IEEE80211_TX_RC_USE_RTS_CTS) ||
 	    (info->status.rates[0].flags & IEEE80211_TX_RC_USE_CTS_PROTECT))
 		txflags |= cpu_to_le16(IEEE80211_RADIOTAP_F_TX_CTS);

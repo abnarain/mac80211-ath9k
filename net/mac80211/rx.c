@@ -298,6 +298,8 @@ ieee80211_add_rx_radiotap_header(struct ieee80211_local *local,
 		pos++;
 	if (status->flag & RX_FLAG_FAILED_PLCP_CRC)
 		rx_flags |= IEEE80211_RADIOTAP_F_RX_BADPLCP;
+	if (status->flag & RX_FLAG_HOMESAW_RX_AGGR)
+		rx_flags |= IEEE80211_RADIOTAP_F_HOMESAW_RX_AGG ;/*_HOMESAW_*/
 	put_unaligned_le16(rx_flags, pos);
 	pos += 2;
 

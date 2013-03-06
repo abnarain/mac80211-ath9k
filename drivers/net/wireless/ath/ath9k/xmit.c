@@ -1001,9 +1001,10 @@ static void ath_buf_set_rate(struct ath_softc *sc, struct ath_buf *bf,
 
 		info->rates[i].PktDuration = ath9k_hw_computetxtime(sc->sc_ah,
 			phy, rate->bitrate * 100, len, rix, is_sp);
-		static int kon=0;
+	/*	static int kon=0;
 		if (kon<50 && len > 1000)
 			printk("abhinav(g): kbps=%d len=%d rix=%d dur=%d %d\n",rate->bitrate *100 , len,rix,info->rates[i].PktDuration,  kon++);
+	*/
 	}
 
 	/* For AR5416 - RTS cannot be followed by a frame larger than 8K */
@@ -1477,7 +1478,12 @@ static void ath_drain_txq_list(struct ath_softc *sc, struct ath_txq *txq,
     deq_tsf =ath9k_hw_gettsf64(ah);
     bf->total_time = deq_tsf - bf->timestamp_temp ;
     bf->timestamp_temp = deq_tsf ;
-
+	struct sk_buff* skb = bf->bf_mpdu;
+	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
+	__le16 s= hdr->seq_ctrl ;
+	static int l2=0;
+	if (l2<1500)
+		printk("abhinav:2 tot=%u ampdu=%d seq_no=%u %d\n",bf->total_time,bf_isampdu(bf), ((cpu_to_be16(s))&0xfff0 >>4) ,l2++);
 
 		txq->axq_depth--;
 		if (bf_is_ampdu_not_probing(bf))
@@ -1681,6 +1687,15 @@ static void ath_tx_txqaddbuf(struct ath_softc *sc, struct ath_txq *txq,
 
 		txq->axq_link = bf_last->bf_desc;
 	}
+	/*_HOMESAW_*/
+	/*The frame is pushed to the hardware; Enqueue timestamp stored    
+	*/
+	u64 time_now =  ath9k_hw_gettsf64(ah);
+	struct ath_buf *cur = bf;
+	while(cur) {			  
+		cur->timestamp_temp = time_now;			    
+		cur = cur->bf_next ;				  				    
+	}
 
 	if (puttxbuf) {
 		TX_STAT_INC(txq->axq_qnum, puttxbuf);
@@ -1693,10 +1708,7 @@ static void ath_tx_txqaddbuf(struct ath_softc *sc, struct ath_txq *txq,
 		TX_STAT_INC(txq->axq_qnum, txstart);
 		ath9k_hw_txstart(ah, txq->axq_qnum);
 	}
-	/*_HOMESAW_*/
-	/*The frame is pushed to the hardware; Enqueue timestamp stored    
-	*/
-	bf->timestamp_temp =  ath9k_hw_gettsf64(ah);
+
 	if (!internal) {
 		txq->axq_depth++;
 		if (bf_is_ampdu_not_probing(bf))
@@ -2073,7 +2085,15 @@ static void ath_tx_complete_buf(struct ath_softc *sc, struct ath_buf *bf,
 	dma_unmap_single(sc->dev, bf->bf_buf_addr, skb->len, DMA_TO_DEVICE);
 	bf->bf_buf_addr = 0;
 
-  tx_info->status.total_time= 0x1;// bf->total_time;
+	bool aggr = !!(bf->bf_state.bf_type & BUF_AGGR);
+	if (aggr){
+		printk("abhinav:tx aggr\n");
+		tx_info->status.tx_aggr_flag=1;
+	}
+	else 
+		tx_info->status.tx_aggr_flag=0;
+
+  tx_info->status.total_time= bf->total_time;
   tx_info->status.contention_time = 0x2;
   u32 tsf_lower = bf->timestamp_temp & 0xffffffff;
   tx_info->status.timestamp_tx = (bf->timestamp_temp & ~0xffffffffULL) | ts->ts_tstamp ;
@@ -2185,12 +2205,19 @@ static void ath_tx_process_buffer(struct ath_softc *sc, struct ath_txq *txq,
 	(4) Last ACK 
 	*/
 	/*_HOMESAW_*/
+	
   u64 deq_tsf;
   struct ath_hw *ah = sc->sc_ah;
   deq_tsf =ath9k_hw_gettsf64(ah);
   bf->total_time = deq_tsf - bf->timestamp_temp ;
   bf->timestamp_temp =deq_tsf ;
-	  
+	struct sk_buff* skb = bf->bf_mpdu;
+	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
+	__le16 s= hdr->seq_ctrl ;
+	static int l1=0;
+	if (l1<1500)
+	printk("abhinav: tot=%u ampdu=%d seq_no=%u %d\n",bf->total_time,bf_isampdu(bf), ((cpu_to_be16(s))&0xfff0 >>4) ,l1++);
+
   txq->axq_depth--;
 	txok = !(ts->ts_status & ATH9K_TXERR_MASK);
 	txq->axq_tx_inprogress = false;
