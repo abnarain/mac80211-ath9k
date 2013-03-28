@@ -325,6 +325,7 @@ static struct ath_buf* ath_clone_txbuf(struct ath_softc *sc, struct ath_buf *bf)
 	tbf->bf_state = bf->bf_state;
 	/*_HOMESAW_*/
 	tbf->timestamp_temp = bf->timestamp_temp;
+	tbf->enqueue_time = bf->enqueue_time;
 
 	return tbf;
 }
@@ -1473,14 +1474,7 @@ static void ath_drain_txq_list(struct ath_softc *sc, struct ath_txq *txq,
 	struct ath_hw *ah = sc->sc_ah;
     u64 deq_tsf;
     deq_tsf =ath9k_hw_gettsf64(ah);
-    bf->total_time = deq_tsf - bf->timestamp_temp ;
     bf->timestamp_temp = deq_tsf ;
-	struct sk_buff* skb = bf->bf_mpdu;
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
-	__le16 s= hdr->seq_ctrl ;
-	static int l2=0;
-	if (l2<1500)
-		printk("abhinav:2 tot=%u ampdu=%d seq_no=%u %d\n",bf->total_time,bf_isampdu(bf), ((cpu_to_be16(s))&0xfff0 >>4) ,l2++);
 
 		txq->axq_depth--;
 		if (bf_is_ampdu_not_probing(bf))
@@ -1690,7 +1684,7 @@ static void ath_tx_txqaddbuf(struct ath_softc *sc, struct ath_txq *txq,
 	u64 time_now =  ath9k_hw_gettsf64(ah);
 	struct ath_buf *cur = bf;
 	while(cur) {			  
-		cur->timestamp_temp = time_now;			    
+		cur->enqueue_time = time_now;			    
 		cur = cur->bf_next ;				  				    
 	}
 
@@ -2092,8 +2086,7 @@ static void ath_tx_complete_buf(struct ath_softc *sc, struct ath_buf *bf,
 		tx_info->status.tx_aggr_flag=1;	
 		}
 	//printk("abhinav: driver flag set %u\n",tx_info->status.tx_aggr_flag);
-  tx_info->status.total_time= bf->total_time;
-  tx_info->status.contention_time = 0x2;
+  tx_info->status.enqueue_time= bf->enqueue_time;
   u32 tsf_lower = bf->timestamp_temp & 0xffffffff;
   tx_info->status.timestamp_tx = (bf->timestamp_temp & ~0xffffffffULL) | ts->ts_tstamp ;
   if (ts->ts_tstamp > tsf_lower &&
@@ -2208,7 +2201,6 @@ static void ath_tx_process_buffer(struct ath_softc *sc, struct ath_txq *txq,
   u64 deq_tsf;
   struct ath_hw *ah = sc->sc_ah;
   deq_tsf =ath9k_hw_gettsf64(ah);
-  bf->total_time = deq_tsf - bf->timestamp_temp ;
   bf->timestamp_temp =deq_tsf ;
 
 	txq->axq_depth--;
