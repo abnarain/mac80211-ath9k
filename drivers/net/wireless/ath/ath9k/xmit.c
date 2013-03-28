@@ -969,9 +969,6 @@ static void ath_buf_set_rate(struct ath_softc *sc, struct ath_buf *bf,
 					ah->txchainmask, info->rates[i].Rate);
 			info->rates[i].PktDuration = ath_pkt_duration(sc, rix, len,
 				 is_40, is_sgi, is_sp);
-			static int aa=0;
-			if (aa <50 && len>1000)
-				printk("abhinav(n): rix=%d, len=%d dur=%d %d\n",rix,len,info->rates[i].PktDuration,aa++);
 			if (rix < 8 && (tx_info->flags & IEEE80211_TX_CTL_STBC))
 				info->rates[i].RateFlags |= ATH9K_RATESERIES_STBC;
 			continue;
@@ -2085,14 +2082,16 @@ static void ath_tx_complete_buf(struct ath_softc *sc, struct ath_buf *bf,
 	dma_unmap_single(sc->dev, bf->bf_buf_addr, skb->len, DMA_TO_DEVICE);
 	bf->bf_buf_addr = 0;
 
-	bool aggr = !!(bf->bf_state.bf_type & BUF_AGGR);
+	bool aggr = !!(bf->bf_state.bf_type & BUF_AGGR); /*abhinav: Flag for frame aggregation*/
 	if (aggr){
-		printk("abhinav:tx aggr\n");
-		tx_info->status.tx_aggr_flag=1;
+//		printk("abhinav:tx aggr\n");
+		tx_info->status.tx_aggr_flag=2;
 	}
-	else 
-		tx_info->status.tx_aggr_flag=0;
-
+	else{
+		//printk("abhinav: no aggr\n");
+		tx_info->status.tx_aggr_flag=1;	
+		}
+	//printk("abhinav: driver flag set %u\n",tx_info->status.tx_aggr_flag);
   tx_info->status.total_time= bf->total_time;
   tx_info->status.contention_time = 0x2;
   u32 tsf_lower = bf->timestamp_temp & 0xffffffff;
@@ -2211,14 +2210,8 @@ static void ath_tx_process_buffer(struct ath_softc *sc, struct ath_txq *txq,
   deq_tsf =ath9k_hw_gettsf64(ah);
   bf->total_time = deq_tsf - bf->timestamp_temp ;
   bf->timestamp_temp =deq_tsf ;
-	struct sk_buff* skb = bf->bf_mpdu;
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
-	__le16 s= hdr->seq_ctrl ;
-	static int l1=0;
-	if (l1<1500)
-	printk("abhinav: tot=%u ampdu=%d seq_no=%u %d\n",bf->total_time,bf_isampdu(bf), ((cpu_to_be16(s))&0xfff0 >>4) ,l1++);
 
-  txq->axq_depth--;
+	txq->axq_depth--;
 	txok = !(ts->ts_status & ATH9K_TXERR_MASK);
 	txq->axq_tx_inprogress = false;
 	if (bf_is_ampdu_not_probing(bf))
