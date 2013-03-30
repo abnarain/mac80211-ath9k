@@ -555,12 +555,6 @@ static void ath_tx_complete_aggr(struct ath_softc *sc, struct ath_txq *txq,
 					fi->bf = tbf;
 				}
 			}
-			/*
-			abhinav's comment : 
-			The frame is sent to the pending queue, 
-			and we loose the corresponding 'ath_tx_status'			
-			descriptor information. so need to add some code here.
-			*/
 
 			/*
 			 * Put this buffer to the temporary pending
@@ -893,14 +887,7 @@ static u32 ath_pkt_duration(struct ath_softc *sc, u8 rix, int pktlen,
 
 	return duration;
 }
-/*
-abhinav's comment :
-This function calculates the airtime of every packet 
-before its sent out (bytes/bitrate). I use part of the loop 
-in this function to calculate  the airtime; Add the time for 
-last ACK and the number of retries to indicate the total time 
-taken by frame for transmission over multiple attempts.
-*/
+
 static void ath_buf_set_rate(struct ath_softc *sc, struct ath_buf *bf,
 			     struct ath_tx_info *info, int len)
 {
@@ -931,11 +918,6 @@ static void ath_buf_set_rate(struct ath_softc *sc, struct ath_buf *bf,
 	if (sc->sc_flags & SC_OP_PREAMBLE_SHORT)
 		info->rtscts_rate |= rate->hw_value_short;
 
-	/*
-	abhinav's comment :
-	airtime calculation; reused in ath_tx_complete_buf() to loop over each
-	the retransmitted frame rates and adding 802.11 constants 
-	*/
 	bf->phy_f=0xf;
 	for (i = 0; i < 4; i++) {
 		bool is_40, is_sgi, is_sp;
@@ -1001,10 +983,6 @@ static void ath_buf_set_rate(struct ath_softc *sc, struct ath_buf *bf,
 
 		info->rates[i].PktDuration = ath9k_hw_computetxtime(sc->sc_ah,
 			phy, rate->bitrate * 100, len, rix, is_sp);
-	/*	static int kon=0;
-		if (kon<50 && len > 1000)
-			printk("abhinav(g): kbps=%d len=%d rix=%d dur=%d %d\n",rate->bitrate *100 , len,rix,info->rates[i].PktDuration,  kon++);
-	*/
 	}
 
 	/* For AR5416 - RTS cannot be followed by a frame larger than 8K */
@@ -1702,8 +1680,8 @@ static void ath_tx_txqaddbuf(struct ath_softc *sc, struct ath_txq *txq,
 		TX_STAT_INC(txq->axq_qnum, txstart);
 		ath9k_hw_txstart(ah, txq->axq_qnum);
 	}
-	static int kk=0;
-		printk("abhinav: d=%u a_d=%u num=%u %d\n",txq->axq_depth,txq->axq_ampdu_depth,txq->axq_qnum,kk++);
+	//static int kk=0;
+	//	printk("abhinav: d=%u a_d=%u num=%u %d\n",txq->axq_depth,txq->axq_ampdu_depth,txq->axq_qnum,kk++);
 	bf->axq_num=txq->axq_qnum ;
 	bf->axq_depth=txq->axq_depth ; 
 	bf->axq_ampdu_depth=txq->axq_ampdu_depth;
