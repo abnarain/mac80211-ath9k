@@ -629,6 +629,7 @@ minstrel_ht_get_rate(void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	bool sample = false;
 	int last = 0;
 
+
 	if (rate_control_send_low(sta, priv_sta, txrc))
 		return;
 

@@ -559,13 +559,14 @@ struct ieee80211_tx_info {
 		struct {
 			struct ieee80211_tx_rate rates[IEEE80211_TX_MAX_RATES];
 			u8 ampdu_ack_len;
-			u32 contention_time; /*_HOMESAW_*/
 			//int ack_signal;
-			u8 ampdu_len;
-			u8 tx_aggr_flag;
-			u64 timestamp_tx;
+			u64 timestamp_tx; /*HOMESAW*/
 			u32 total_time;
-			/* 15 bytes free */
+			u16 ampdu_qsize;
+			u16 mpdu_qsize;
+			u8 ath_qnum;
+			u8 ampdu_len;
+			/* 15 bytes free ; not now ;) */ 
 		} status;
 		struct {
 			struct ieee80211_tx_rate driver_rates[

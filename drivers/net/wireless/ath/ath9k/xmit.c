@@ -936,6 +936,7 @@ static void ath_buf_set_rate(struct ath_softc *sc, struct ath_buf *bf,
 	airtime calculation; reused in ath_tx_complete_buf() to loop over each
 	the retransmitted frame rates and adding 802.11 constants 
 	*/
+	bf->phy_f=0xf;
 	for (i = 0; i < 4; i++) {
 		bool is_40, is_sgi, is_sp;
 		int phy;
@@ -981,6 +982,7 @@ static void ath_buf_set_rate(struct ath_softc *sc, struct ath_buf *bf,
 			phy = WLAN_RC_PHY_CCK;
 		else
 			phy = WLAN_RC_PHY_OFDM;
+		bf->phy_f=phy;	
 
 		rate = &sc->sbands[tx_info->band].bitrates[rates[i].idx];
 		info->rates[i].Rate = rate->hw_value;
@@ -1681,6 +1683,7 @@ static void ath_tx_txqaddbuf(struct ath_softc *sc, struct ath_txq *txq,
 	/*_HOMESAW_*/
 	/*The frame is pushed to the hardware; Enqueue timestamp stored    
 	*/
+	int a_d =-1, d=0;
 	u64 time_now =  ath9k_hw_gettsf64(ah);
 	struct ath_buf *cur = bf;
 	while(cur) {			  
@@ -1699,6 +1702,11 @@ static void ath_tx_txqaddbuf(struct ath_softc *sc, struct ath_txq *txq,
 		TX_STAT_INC(txq->axq_qnum, txstart);
 		ath9k_hw_txstart(ah, txq->axq_qnum);
 	}
+	static int kk=0;
+		printk("abhinav: d=%u a_d=%u num=%u %d\n",txq->axq_depth,txq->axq_ampdu_depth,txq->axq_qnum,kk++);
+	bf->axq_num=txq->axq_qnum ;
+	bf->axq_depth=txq->axq_depth ; 
+	bf->axq_ampdu_depth=txq->axq_ampdu_depth;
 
 	if (!internal) {
 		txq->axq_depth++;
@@ -1720,7 +1728,7 @@ static void ath_tx_send_ampdu(struct ath_softc *sc, struct ath_atx_tid *tid,
 	 * - the TID is currently paused for ADDBA/BAR request
 	 * - seqno is not within block-ack window
 	 * - h/w queue depth exceeds low water mark
-	 */
+	 */	 
 	if (!skb_queue_empty(&tid->buf_q) || tid->paused ||
 	    !BAW_WITHIN(tid->seq_start, tid->baw_size, tid->seq_next) ||
 	    txctl->txq->axq_ampdu_depth >= ATH_AGGR_MIN_QDEPTH) {
@@ -2086,7 +2094,6 @@ static void ath_tx_complete_buf(struct ath_softc *sc, struct ath_buf *bf,
 		tx_info->status.tx_aggr_flag=1;	
 		}
 	//printk("abhinav: driver flag set %u\n",tx_info->status.tx_aggr_flag);
-  tx_info->status.enqueue_time= bf->enqueue_time;
   u32 tsf_lower = bf->timestamp_temp & 0xffffffff;
   tx_info->status.timestamp_tx = (bf->timestamp_temp & ~0xffffffffULL) | ts->ts_tstamp ;
   if (ts->ts_tstamp > tsf_lower &&
@@ -2096,6 +2103,11 @@ static void ath_tx_complete_buf(struct ath_softc *sc, struct ath_buf *bf,
   if (ts->ts_tstamp < tsf_lower &&
       unlikely(tsf_lower - ts->ts_tstamp > 0x10000000))
     tx_info->status.timestamp_tx += 0x100000000ULL;
+  tx_info->status.total_time= tx_info->status.timestamp_tx-bf->enqueue_time;
+  tx_info->status.ampdu_qsize = bf->axq_ampdu_depth;
+  tx_info->status.mpdu_qsize = bf->axq_depth;
+  tx_info->status.ath_qnum =bf->axq_num; 
+  tx_info->status.phy_flag = bf->phy_f ; 
   
 	if (bf->bf_state.bfs_paprd) {
 		if (time_after(jiffies,

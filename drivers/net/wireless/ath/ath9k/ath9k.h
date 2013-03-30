@@ -260,7 +260,11 @@ struct ath_buf {
 	bool bf_stale;
 	struct ath_buf_state bf_state;
 	u64 timestamp_temp; /*_HOMESAW_*/
-	u32 total_time ; /*_HOMESAW_*/
+	u64 enqueue_time ; /*_HOMESAW_*/
+	u16 axq_ampdu_depth;
+	u16 axq_depth; 
+	u8 axq_num;
+	u8 phy_f;
 };
 
 struct ath_atx_tid {
