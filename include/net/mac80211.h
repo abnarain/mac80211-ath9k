@@ -565,6 +565,8 @@ struct ieee80211_tx_info {
 			u16 ampdu_qsize;
 			u16 mpdu_qsize;
 			u8 ath_qnum;
+			u8 tx_aggr_flag;
+			u8 phy_flag;
 			u8 ampdu_len;
 			/* 15 bytes free ; not now ;) */ 
 		} status;
