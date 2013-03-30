@@ -343,7 +343,7 @@ ieee80211_add_rx_radiotap_header(struct ieee80211_local *local,
     rthdr->it_present |= cpu_to_le32(1 <<IEEE80211_RADIOTAP_OFDM_PHYERR_COUNT);
     put_unaligned_le32(a9k.hs.ofdm_phyerr_,pos);
     pos +=4 ;
-    rthdr->it_present |= cpu_to_le32(1 <<IEEE80211_RADIOTAP_RX_QUEUE_TIME);
+    rthdr->it_present |= cpu_to_le32(1 <<IEEE80211_RADIOTAP_TOTAL_TIME);
     put_unaligned_le32(a9k.hs.time_buf_dur_,pos);
     pos +=4;
     rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_CAPLEN);
