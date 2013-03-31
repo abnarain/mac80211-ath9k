@@ -254,13 +254,14 @@ static int ieee80211_tx_radiotap_len(struct ieee80211_tx_info *info)
 #ifdef _HOMESAW_
   len +=8;
   len +=10;
+  len +=7;
   static int gore=0;
   if (gore <5) {
     printk("abhinav:tx len=%d %d\n",len,gore++);
   }  
 #endif 
 
-	return 42;
+	return 48;
 }
 
 static void ieee80211_add_tx_radiotap_header(struct ieee80211_supported_band
@@ -353,10 +354,25 @@ static void ieee80211_add_tx_radiotap_header(struct ieee80211_supported_band
 		pos[2] = info->status.rates[0].idx;
 		pos += 3;
 	}
+//	static int k2=0;
+//	if (k2<1500)
+//	printk("abhinav: flag=%u a_s=%u,m_s=%u, num=%u %d\n",info->status.phy_flag,info->status.ampdu_qsize ,info->status.mpdu_qsize ,info->status.ath_qnum,k2++);
+	
 #ifdef _HOMESAW_
-  rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_ENQUEUE_TIME);
-  put_unaligned_le64(info->status.enqueue_time,pos);
-  pos +=8;
+  rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_TOTAL_TIME);
+  put_unaligned_le64(info->status.total_time,pos);
+  pos +=4;
+
+  rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_QUEUE_SIZES);
+  put_unaligned_le16(info->status.mpdu_qsize,pos);
+  pos +=2;
+  put_unaligned_le16(info->status.ampdu_qsize,pos);
+  pos +=2;
+  rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_COLLECTION);
+  *pos=info->status.phy_flag;
+  pos++;
+  *pos=info->status.ath_qnum;
+  pos++;
   unsigned char * temp=pos ;
   int i ;
   rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_RATES_TRIED);
@@ -371,14 +387,16 @@ static void ieee80211_add_tx_radiotap_header(struct ieee80211_supported_band
     }
     *pos= info->status.rates[i].idx;
     pos++;
-    *pos=info->status.rates[i].count ;
+    *pos= info->status.rates[i].count ;
     pos++;
-    //info->status.rates[i].flags;
-    //pos++;
+    *pos= info->status.rates[i].flags;
+    pos++;
   }
- pos= temp+10;  
-  *pos=0x5;
-  pos++;
+ pos= temp+15;  
+  static int lp=0;
+  if (lp <12)
+	  printk("abhinav: diff=%d te=%d %d\n ",temp-((unsigned char *)(rthdr + 1)), pos-temp, lp++);
+  *pos=0x9;
 #endif 
 }
 

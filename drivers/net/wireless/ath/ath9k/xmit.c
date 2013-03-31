@@ -2083,8 +2083,8 @@ static void ath_tx_complete_buf(struct ath_softc *sc, struct ath_buf *bf,
     tx_info->status.timestamp_tx += 0x100000000ULL;
   tx_info->status.total_time= tx_info->status.timestamp_tx-bf->enqueue_time;
   tx_info->status.ampdu_qsize = bf->axq_ampdu_depth;
-  tx_info->status.mpdu_qsize = bf->axq_depth;
-  tx_info->status.ath_qnum =bf->axq_num; 
+  tx_info->status.mpdu_qsize =  bf->axq_depth;
+  tx_info->status.ath_qnum =  bf->axq_num; 
   tx_info->status.phy_flag = bf->phy_f ; 
   
 	if (bf->bf_state.bfs_paprd) {
